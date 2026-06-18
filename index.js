@@ -12,7 +12,7 @@ const client = new Client({
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 
-// load saved data
+// load data
 let data = {
   count: 0,
   lastUser: null,
@@ -27,7 +27,7 @@ function save() {
   fs.writeFileSync("./count.json", JSON.stringify(data, null, 2));
 }
 
-// milestones (MUST stay inside this object)
+// milestones
 const MILESTONES = {
   100: "💯",
   500: "🔥",
@@ -45,18 +45,15 @@ const MILESTONES = {
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  // only allow one channel
   if (message.channel.id !== CHANNEL_ID) return;
 
   const content = message.content.trim();
-
-  // only pure numbers allowed
   if (!/^\d+$/.test(content)) return;
 
   const num = parseInt(content);
   const expected = data.count + 1;
 
-  // same user twice in a row -> delete
+  // same user twice -> delete
   if (message.author.id === data.lastUser) {
     await message.delete().catch(() => {});
     return;
@@ -78,29 +75,39 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // first mistake -> warning
+  // ❌ wrong number logic
+  if (data.count < 100) {
+    // below 100 → instant reset (no warning system)
+    data.count = 0;
+    data.lastUser = null;
+    data.warning = false;
+    save();
+
+    await message.react("❌");
+    message.channel.send(`❌ Reset! Start again from **1**.`);
+    return;
+  }
+
+  // 100+ system → warning mode
   if (!data.warning) {
     data.warning = true;
     save();
 
     await message.react("⚠️");
     message.channel.send(
-      `⚠️ Wrong! The next number should be **${expected}**. Continue from ${expected}.`
+      `⚠️ Warning! The next number should be **${expected}**. Continue from ${expected}.`
     );
-
     return;
   }
 
-  // second mistake -> reset
+  // second mistake (100+) → reset
   data.count = 0;
   data.lastUser = null;
   data.warning = false;
   save();
 
   await message.react("❌");
-  message.channel.send(
-    `❌ Count reset! Start again from **1**.`
-  );
+  message.channel.send(`❌ Count reset! Start again from **1**.`);
 });
 
 client.once("ready", () => {
