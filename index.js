@@ -1,5 +1,15 @@
 const fs = require("fs");
-const { Client, GatewayIntentBits } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  REST,
+  Routes,
+  SlashCommandBuilder
+} = require("discord.js");
+
+const TOKEN = process.env.TOKEN;
+const CHANNEL_ID = process.env.CHANNEL_ID;
+const CLIENT_ID = process.env.CLIENT_ID; // REQUIRED for slash commands
 
 const client = new Client({
   intents: [
@@ -8,9 +18,6 @@ const client = new Client({
     GatewayIntentBits.MessageContent
   ]
 });
-
-const TOKEN = process.env.TOKEN;
-const CHANNEL_ID = process.env.CHANNEL_ID;
 
 // load data
 let data = {
@@ -42,9 +49,40 @@ const MILESTONES = {
   1000000: "🐐"
 };
 
+/* =========================
+   SLASH COMMAND REGISTRATION
+========================= */
+
+const commands = [
+  new SlashCommandBuilder()
+    .setName("test")
+    .setDescription("Sets next number to 100"),
+
+  new SlashCommandBuilder()
+    .setName("reset")
+    .setDescription("Resets count to 1")
+].map(cmd => cmd.toJSON());
+
+const rest = new REST({ version: "10" }).setToken(TOKEN);
+
+(async () => {
+  try {
+    await rest.put(
+      Routes.applicationCommands(CLIENT_ID),
+      { body: commands }
+    );
+    console.log("Slash commands registered.");
+  } catch (err) {
+    console.error(err);
+  }
+})();
+
+/* =========================
+   MESSAGE COUNTING LOGIC
+========================= */
+
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
-
   if (message.channel.id !== CHANNEL_ID) return;
 
   const content = message.content.trim();
@@ -53,13 +91,11 @@ client.on("messageCreate", async (message) => {
   const num = parseInt(content);
   const expected = data.count + 1;
 
-  // same user twice -> delete
   if (message.author.id === data.lastUser) {
     await message.delete().catch(() => {});
     return;
   }
 
-  // correct number
   if (num === expected) {
     data.count = num;
     data.lastUser = message.author.id;
@@ -75,39 +111,64 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // ❌ wrong number logic
+  // below 100 = instant reset
   if (data.count < 100) {
-    // below 100 → instant reset (no warning system)
     data.count = 0;
     data.lastUser = null;
     data.warning = false;
     save();
 
     await message.react("❌");
-    message.channel.send(`❌ Reset! Start again from **1**.`);
+    message.channel.send("❌ Reset! Start again from **1**.");
     return;
   }
 
-  // 100+ system → warning mode
+  // 100+ warning system
   if (!data.warning) {
     data.warning = true;
     save();
 
     await message.react("⚠️");
     message.channel.send(
-      `⚠️ Warning! The next number should be **${expected}**. Continue from ${expected}.`
+      `⚠️ Wrong! Next number should be **${expected}**.`
     );
     return;
   }
 
-  // second mistake (100+) → reset
+  // second mistake reset
   data.count = 0;
   data.lastUser = null;
   data.warning = false;
   save();
 
   await message.react("❌");
-  message.channel.send(`❌ Count reset! Start again from **1**.`);
+  message.channel.send("❌ Count reset! Start again from **1**.");
+});
+
+/* =========================
+   SLASH COMMAND HANDLER
+========================= */
+
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "test") {
+    data.count = 99;
+    data.lastUser = null;
+    data.warning = false;
+    save();
+
+    return interaction.reply("🧪 Test mode enabled — next number is **100**.");
+  }
+
+  if (interaction.commandName === "reset") {
+    data.count = 0;
+    data.lastUser = null;
+    data.warning = false;
+    save();
+
+    return interaction.reply("🔄 Count reset — next number is **1**.");
+  }
 });
 
 client.once("ready", () => {
