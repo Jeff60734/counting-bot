@@ -9,7 +9,12 @@ const {
 
 const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
-const CLIENT_ID = process.env.CLIENT_ID; // REQUIRED for slash commands
+const CLIENT_ID = process.env.CLIENT_ID;
+
+// 🔐 ONLY YOU CAN USE COMMANDS
+const ALLOWED_USERS = [
+  "1464219894785507369"
+];
 
 const client = new Client({
   intents: [
@@ -50,7 +55,7 @@ const MILESTONES = {
 };
 
 /* =========================
-   SLASH COMMAND REGISTRATION
+   SLASH COMMAND SETUP
 ========================= */
 
 const commands = [
@@ -78,7 +83,7 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 })();
 
 /* =========================
-   MESSAGE COUNTING LOGIC
+   COUNTING SYSTEM
 ========================= */
 
 client.on("messageCreate", async (message) => {
@@ -111,7 +116,6 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // below 100 = instant reset
   if (data.count < 100) {
     data.count = 0;
     data.lastUser = null;
@@ -123,7 +127,6 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // 100+ warning system
   if (!data.warning) {
     data.warning = true;
     save();
@@ -135,7 +138,6 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // second mistake reset
   data.count = 0;
   data.lastUser = null;
   data.warning = false;
@@ -146,11 +148,19 @@ client.on("messageCreate", async (message) => {
 });
 
 /* =========================
-   SLASH COMMAND HANDLER
+   SLASH COMMANDS
 ========================= */
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+
+  // 🔐 only you allowed
+  if (!ALLOWED_USERS.includes(interaction.user.id)) {
+    return interaction.reply({
+      content: "❌ You are not allowed to use this command.",
+      ephemeral: true
+    });
+  }
 
   if (interaction.commandName === "test") {
     data.count = 99;
@@ -158,7 +168,7 @@ client.on("interactionCreate", async (interaction) => {
     data.warning = false;
     save();
 
-    return interaction.reply("🧪 Test mode enabled — next number is **100**.");
+    return interaction.reply("🧪 Test mode: next number is **100**.");
   }
 
   if (interaction.commandName === "reset") {
@@ -167,7 +177,7 @@ client.on("interactionCreate", async (interaction) => {
     data.warning = false;
     save();
 
-    return interaction.reply("🔄 Count reset — next number is **1**.");
+    return interaction.reply("🔄 Reset done: next number is **1**.");
   }
 });
 
