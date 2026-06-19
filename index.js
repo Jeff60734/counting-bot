@@ -128,7 +128,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  if (data.count < 100) {
+  if (data.count < 99) {
     data.count = 0;
     data.lastUser = null;
     data.warning = false;
