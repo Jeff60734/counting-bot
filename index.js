@@ -85,7 +85,7 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("setcount")
-    .setDescription("Set the current count (admin only)")
+    .setDescription("Set the next number (admin only)")
     .addIntegerOption(option =>
       option
         .setName("number")
@@ -192,7 +192,7 @@ client.on("interactionCreate", async (interaction) => {
     );
   }
 
-  // ADMIN ONLY COMMANDS
+  // ADMIN ONLY
   if (!ALLOWED_USERS.includes(interaction.user.id)) {
     return interaction.reply({
       content: "❌ You are not allowed to use this command.",
@@ -221,12 +221,12 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.commandName === "setcount") {
     const value = interaction.options.getInteger("number");
 
-    data.count = value;
+    data.count = value - 1; // IMPORTANT FIX
     data.lastUser = null;
     data.warning = false;
     save();
 
-    return interaction.reply(`🔧 Count set to **${value}**.`);
+    return interaction.reply(`🔧 Next number set to **${value}**.`);
   }
 });
 
