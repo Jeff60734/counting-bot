@@ -81,10 +81,20 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("count")
-    .setDescription("Shows current counting number")
+    .setDescription("Shows current counting number"),
+
+  new SlashCommandBuilder()
+    .setName("setcount")
+    .setDescription("Set the current count (admin only)")
+    .addIntegerOption(option =>
+      option
+        .setName("number")
+        .setDescription("Number to set")
+        .setRequired(true)
+    )
 ].map(cmd => cmd.toJSON());
 
-const rest = new REST({ version: 10 }).setToken(TOKEN);
+const rest = new REST({ version: "10" }).setToken(TOKEN);
 
 (async () => {
   try {
@@ -112,7 +122,7 @@ client.on("messageCreate", async (message) => {
   const num = parseInt(content);
   const expected = data.count + 1;
 
-  // same user twice -> delete
+  // delete repeat count from same user
   if (message.author.id === data.lastUser) {
     await message.delete().catch(() => {});
     return;
@@ -134,7 +144,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // WARNING SYSTEM STARTS AT 99+
+  // warning system starts at 99+
   if (data.count < 99) {
     data.count = 0;
     data.lastUser = null;
@@ -146,7 +156,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // first mistake warning
+  // first mistake = warning
   if (!data.warning) {
     data.warning = true;
     save();
@@ -158,7 +168,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  // second mistake reset
+  // second mistake = reset
   data.count = 0;
   data.lastUser = null;
   data.warning = false;
@@ -182,7 +192,7 @@ client.on("interactionCreate", async (interaction) => {
     );
   }
 
-  // PRIVATE COMMANDS ONLY
+  // ADMIN ONLY COMMANDS
   if (!ALLOWED_USERS.includes(interaction.user.id)) {
     return interaction.reply({
       content: "❌ You are not allowed to use this command.",
@@ -206,6 +216,17 @@ client.on("interactionCreate", async (interaction) => {
     save();
 
     return interaction.reply("🔄 Reset done: next number is **1**.");
+  }
+
+  if (interaction.commandName === "setcount") {
+    const value = interaction.options.getInteger("number");
+
+    data.count = value;
+    data.lastUser = null;
+    data.warning = false;
+    save();
+
+    return interaction.reply(`🔧 Count set to **${value}**.`);
   }
 });
 
