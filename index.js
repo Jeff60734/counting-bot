@@ -1,16 +1,4 @@
 const fs = require("fs");
-const express = require("express");
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => {
-  res.send("Counting bot is running!");
-});
-
-app.listen(PORT, () => {
-  console.log(`Web server running on port ${PORT}`);
-});
 const {
   Client,
   GatewayIntentBits,
@@ -23,7 +11,6 @@ const TOKEN = process.env.TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const CLIENT_ID = process.env.CLIENT_ID;
 
-// 🔐 ONLY YOU CAN USE COMMANDS
 const ALLOWED_USERS = [
   "1464219894785507369"
 ];
@@ -67,7 +54,7 @@ const MILESTONES = {
 };
 
 /* =========================
-   SLASH COMMAND SETUP
+   SLASH COMMANDS
 ========================= */
 
 const commands = [
@@ -77,7 +64,11 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName("reset")
-    .setDescription("Resets count to 1")
+    .setDescription("Resets count to 1"),
+
+  new SlashCommandBuilder()
+    .setName("count")
+    .setDescription("Shows current counting number")
 ].map(cmd => cmd.toJSON());
 
 const rest = new REST({ version: "10" }).setToken(TOKEN);
@@ -95,7 +86,7 @@ const rest = new REST({ version: "10" }).setToken(TOKEN);
 })();
 
 /* =========================
-   COUNTING SYSTEM
+   COUNTING LOGIC
 ========================= */
 
 client.on("messageCreate", async (message) => {
@@ -128,7 +119,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  if (data.count < 99) {
+  if (data.count < 100) {
     data.count = 0;
     data.lastUser = null;
     data.warning = false;
@@ -160,13 +151,12 @@ client.on("messageCreate", async (message) => {
 });
 
 /* =========================
-   SLASH COMMANDS
+   SLASH HANDLER
 ========================= */
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  // 🔐 only you allowed
   if (!ALLOWED_USERS.includes(interaction.user.id)) {
     return interaction.reply({
       content: "❌ You are not allowed to use this command.",
@@ -190,6 +180,12 @@ client.on("interactionCreate", async (interaction) => {
     save();
 
     return interaction.reply("🔄 Reset done: next number is **1**.");
+  }
+
+  if (interaction.commandName === "count") {
+    return interaction.reply(
+      `📊 Current count: **${data.count}**\n➡️ Next number: **${data.count + 1}**`
+    );
   }
 });
 
