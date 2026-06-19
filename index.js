@@ -11,6 +11,7 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Web server running on port ${PORT}`);
 });
+
 const {
   Client,
   GatewayIntentBits,
@@ -83,7 +84,7 @@ const commands = [
     .setDescription("Shows current counting number")
 ].map(cmd => cmd.toJSON());
 
-const rest = new REST({ version: "10" }).setToken(TOKEN);
+const rest = new REST({ version: 10 }).setToken(TOKEN);
 
 (async () => {
   try {
@@ -111,11 +112,13 @@ client.on("messageCreate", async (message) => {
   const num = parseInt(content);
   const expected = data.count + 1;
 
+  // same user twice -> delete
   if (message.author.id === data.lastUser) {
     await message.delete().catch(() => {});
     return;
   }
 
+  // correct number
   if (num === expected) {
     data.count = num;
     data.lastUser = message.author.id;
@@ -131,7 +134,8 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
-  if (data.count < 100) {
+  // WARNING SYSTEM STARTS AT 99+
+  if (data.count < 99) {
     data.count = 0;
     data.lastUser = null;
     data.warning = false;
@@ -142,6 +146,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
+  // first mistake warning
   if (!data.warning) {
     data.warning = true;
     save();
@@ -153,6 +158,7 @@ client.on("messageCreate", async (message) => {
     return;
   }
 
+  // second mistake reset
   data.count = 0;
   data.lastUser = null;
   data.warning = false;
@@ -163,12 +169,20 @@ client.on("messageCreate", async (message) => {
 });
 
 /* =========================
-   SLASH HANDLER
+   SLASH COMMAND HANDLER
 ========================= */
 
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
+  // PUBLIC COMMAND
+  if (interaction.commandName === "count") {
+    return interaction.reply(
+      `📊 Current count: **${data.count}**\n➡️ Next number: **${data.count + 1}**`
+    );
+  }
+
+  // PRIVATE COMMANDS ONLY
   if (!ALLOWED_USERS.includes(interaction.user.id)) {
     return interaction.reply({
       content: "❌ You are not allowed to use this command.",
@@ -192,12 +206,6 @@ client.on("interactionCreate", async (interaction) => {
     save();
 
     return interaction.reply("🔄 Reset done: next number is **1**.");
-  }
-
-  if (interaction.commandName === "count") {
-    return interaction.reply(
-      `📊 Current count: **${data.count}**\n➡️ Next number: **${data.count + 1}**`
-    );
   }
 });
 
