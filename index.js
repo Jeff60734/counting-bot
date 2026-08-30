@@ -268,13 +268,14 @@ PUBLIC COMMAND
 if (interaction.commandName === "count") {
 if (!data.channelId) {
 return interaction.reply({
-content: '⚠️ No counting channel has been set up yet. An administrator can use "/setup" in a channel.',
+content: '⚠️ No counting channel has been set up yet. An administrator can use /setup in a channel.',
 ephemeral: true
 });
 }
 
 return interaction.reply(
-"📊 Current count: ** ${data.count} ** ➡️ Next number: **${data.count + 1}**"
+"📊 Current count: " + data.count + "\n" +
+"➡️ Next number: " + (data.count + 1) + ""
 );
 }
 
