@@ -41,7 +41,7 @@ GatewayIntentBits.MessageContent
 LOAD SERVER DATA
 ========================= */
 
-// Each server gets its own data
+// Each Discord server gets its own counting data
 let serverData = {};
 
 if (fs.existsSync("./count.json")) {
@@ -150,16 +150,16 @@ COUNTING LOGIC
 ========================= */
 
 client.on("messageCreate", async (message) => {
-// Ignore bots
+// Ignore bot messages
 if (message.author.bot) return;
 
 // Ignore DMs
 if (!message.guild) return;
 
-// Get this server's data
+// Get this server's separate data
 const data = getServerData(message.guild.id);
 
-// Only allow counting in this server's setup channel
+// Only count in this server's configured channel
 if (!data.channelId) return;
 if (message.channel.id !== data.channelId) return;
 
@@ -171,7 +171,7 @@ if (!/^\d+$/.test(content)) return;
 const num = parseInt(content, 10);
 const expected = data.count + 1;
 
-// Delete repeat count from same user
+// Delete repeat count from the same user
 if (message.author.id === data.lastUser) {
 await message.delete().catch(() => {});
 return;
@@ -195,7 +195,7 @@ return;
 
 }
 
-// Reset normally before 100
+// Normal reset before 100
 if (data.count < 99) {
 data.count = 0;
 data.lastUser = null;
@@ -213,7 +213,7 @@ return;
 
 }
 
-// First mistake at 100+ = warning
+// First mistake at 100 or higher = warning
 if (!data.warning) {
 data.warning = true;
 
@@ -294,6 +294,7 @@ interaction.memberPermissions?.has(
 PermissionFlagsBits.Administrator
 );
 
+// Only you or server administrators can use admin commands
 if (!isAllowedUser && !isAdmin) {
 return interaction.reply({
 content: "❌ You need Administrator permission to use this command.",
