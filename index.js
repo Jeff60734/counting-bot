@@ -38,28 +38,45 @@ GatewayIntentBits.MessageContent
 });
 
 /* =========================
-LOAD DATA
+LOAD SERVER DATA
 ========================= */
 
-let data = {
+// Each server gets its own data
+let serverData = {};
+
+if (fs.existsSync("./count.json")) {
+try {
+serverData = JSON.parse(
+fs.readFileSync("./count.json", "utf8")
+);
+} catch (error) {
+console.error("Error loading count.json:", error);
+serverData = {};
+}
+}
+
+function save() {
+fs.writeFileSync(
+"./count.json",
+JSON.stringify(serverData, null, 2)
+);
+}
+
+// Get or create data for a specific server
+function getServerData(guildId) {
+if (!serverData[guildId]) {
+serverData[guildId] = {
 count: 0,
 lastUser: null,
 warning: false,
 channelId: null
 };
 
-if (fs.existsSync("./count.json")) {
-data = {
-...data,
-...JSON.parse(fs.readFileSync("./count.json"))
-};
+save();
+
 }
 
-function save() {
-fs.writeFileSync(
-"./count.json",
-JSON.stringify(data, null, 2)
-);
+return serverData[guildId];
 }
 
 /* =========================
@@ -133,9 +150,16 @@ COUNTING LOGIC
 ========================= */
 
 client.on("messageCreate", async (message) => {
+// Ignore bots
 if (message.author.bot) return;
 
-// Only allow counting in the setup channel
+// Ignore DMs
+if (!message.guild) return;
+
+// Get this server's data
+const data = getServerData(message.guild.id);
+
+// Only allow counting in this server's setup channel
 if (!data.channelId) return;
 if (message.channel.id !== data.channelId) return;
 
@@ -144,7 +168,7 @@ const content = message.content.trim();
 // Ignore messages that aren't just numbers
 if (!/^\d+$/.test(content)) return;
 
-const num = parseInt(content);
+const num = parseInt(content, 10);
 const expected = data.count + 1;
 
 // Delete repeat count from same user
@@ -158,6 +182,7 @@ if (num === expected) {
 data.count = num;
 data.lastUser = message.author.id;
 data.warning = false;
+
 save();
 
 await message.react("✅");
@@ -175,11 +200,12 @@ if (data.count < 99) {
 data.count = 0;
 data.lastUser = null;
 data.warning = false;
+
 save();
 
 await message.react("❌");
 
-message.channel.send(
+await message.channel.send(
   "❌ Reset! Start again from **1**."
 );
 
@@ -190,11 +216,12 @@ return;
 // First mistake at 100+ = warning
 if (!data.warning) {
 data.warning = true;
+
 save();
 
 await message.react("⚠️");
 
-message.channel.send(
+await message.channel.send(
   `⚠️ Wrong! Next number should be **${expected}**.`
 );
 
@@ -206,11 +233,12 @@ return;
 data.count = 0;
 data.lastUser = null;
 data.warning = false;
+
 save();
 
 await message.react("❌");
 
-message.channel.send(
+await message.channel.send(
 "❌ Count reset! Start again from 1."
 );
 });
@@ -222,11 +250,25 @@ SLASH COMMAND HANDLER
 client.on("interactionCreate", async (interaction) => {
 if (!interaction.isChatInputCommand()) return;
 
-// Public command
+// Ignore commands outside servers
+if (!interaction.guild) {
+return interaction.reply({
+content: "❌ This bot can only be used inside a server.",
+ephemeral: true
+});
+}
+
+// Get this server's separate data
+const data = getServerData(interaction.guild.id);
+
+/* =========================
+PUBLIC COMMAND
+========================= */
+
 if (interaction.commandName === "count") {
 if (!data.channelId) {
 return interaction.reply({
-content: "⚠️ No counting channel has been set up yet.",
+content: "⚠️ No counting channel has been set up yet. An administrator can use "/setup" in a channel.",
 ephemeral: true
 });
 }
@@ -237,18 +279,21 @@ return interaction.reply(
 
 }
 
-// Check if user is you
+/* =========================
+ADMIN CHECK
+========================= */
+
+// You can always use admin commands
 const isAllowedUser = ALLOWED_USERS.includes(
 interaction.user.id
 );
 
-// Check if user has Administrator permission
+// Server administrators can also use admin commands
 const isAdmin =
 interaction.memberPermissions?.has(
 PermissionFlagsBits.Administrator
 );
 
-// Only you or server administrators can use admin commands
 if (!isAllowedUser && !isAdmin) {
 return interaction.reply({
 content: "❌ You need Administrator permission to use this command.",
@@ -263,7 +308,7 @@ SETUP
 if (interaction.commandName === "setup") {
 data.channelId = interaction.channel.id;
 
-// Optional: reset counting when changing channels
+// Reset this server's count when changing channel
 data.count = 0;
 data.lastUser = null;
 data.warning = false;
@@ -271,8 +316,8 @@ data.warning = false;
 save();
 
 return interaction.reply(
-  `✅ This channel is now the counting channel!\n\n` +
-  `Start counting by typing **1**.`
+  "✅ This channel is now this server's counting channel!\n\n" +
+  "Start counting by typing **1**."
 );
 
 }
@@ -285,6 +330,7 @@ if (interaction.commandName === "test") {
 data.count = 99;
 data.lastUser = null;
 data.warning = false;
+
 save();
 
 return interaction.reply(
@@ -301,6 +347,7 @@ if (interaction.commandName === "reset") {
 data.count = 0;
 data.lastUser = null;
 data.warning = false;
+
 save();
 
 return interaction.reply(
@@ -314,12 +361,19 @@ SET COUNT
 ========================= */
 
 if (interaction.commandName === "setcount") {
-const value =
-interaction.options.getInteger("number");
+const value = interaction.options.getInteger("number");
+
+if (value < 1) {
+  return interaction.reply({
+    content: "❌ The number must be **1 or higher**.",
+    ephemeral: true
+  });
+}
 
 data.count = value - 1;
 data.lastUser = null;
 data.warning = false;
+
 save();
 
 return interaction.reply(
@@ -335,16 +389,9 @@ BOT READY
 
 client.once("ready", () => {
 console.log("Logged in as ${client.user.tag}");
-
-if (data.channelId) {
 console.log(
-"Counting channel: ${data.channelId}"
+"Serving ${client.guilds.cache.size} server(s)."
 );
-} else {
-console.log(
-"No counting channel set. Use /setup in a channel."
-);
-}
 });
 
 client.login(TOKEN);
