@@ -274,8 +274,7 @@ ephemeral: true
 }
 
 return interaction.reply(
-"📊 Current count: ** ${data.count} ** 
- ➡️ Next number: **${data.count + 1}**"
+"📊 Current count: ** ${data.count} ** ➡️ Next number: **${data.count + 1}**"
 );
 }
 
